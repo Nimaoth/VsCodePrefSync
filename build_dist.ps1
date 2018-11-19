@@ -1,4 +1,4 @@
-param ([string]$npm_install = $False)
+param ([bool]$npm_install = $False)
 
 if ($npm_install) {
     &npm install
@@ -7,7 +7,9 @@ if ($npm_install) {
 
 $targetDir = "dist/vscodeprefsync"
 
-Remove-Item "dist" -Force -Recurse
+if (Test-Path "dist") {
+    Remove-Item "dist" -Force -Recurse
+}
 New-Item -Path . -Name $targetDir -ItemType "directory"
 
 Copy-Item .\node_modules $targetDir -Recurse
