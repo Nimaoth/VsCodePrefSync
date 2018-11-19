@@ -1,5 +1,9 @@
-#&npm install
-#&npm run compile
+param ([string]$npm_install = $False)
+
+if ($npm_install) {
+    &npm install
+}
+&npm run compile
 
 $targetDir = "dist/vscodeprefsync"
 
