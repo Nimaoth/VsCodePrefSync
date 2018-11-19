@@ -11,6 +11,8 @@ const simpleGit = require('simple-git/promise');
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+    vscode.window.showInformationMessage(`Activating VsCodePrefSync extension`);
+
     let upload = vscode.commands.registerCommand('extension.uploadPreferencesToGithub', () => {
         vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
