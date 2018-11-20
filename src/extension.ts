@@ -152,6 +152,9 @@ async function uploadPreferencesToGithub(progress: vscode.Progress<{ message?: s
             let res = await git.log(["-1", "--pretty=%B"]);
             let msg = res.all[0].hash;
             commitMessage = "" + (Number(msg) + 1);
+            if (commitMessage === "NaN") {
+                commitMessage = "0";
+            }
         } catch (e) {}
         
         progress.report({message: "commit files..."});
