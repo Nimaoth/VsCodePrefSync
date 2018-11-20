@@ -30,8 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
         });
     });
 
-    context.subscriptions.push(upload);
-    context.subscriptions.push(download);
+    context.subscriptions.push(upload, download);
 }
 
 function getAppdataPath() : string {
@@ -101,6 +100,16 @@ async function uploadPreferencesToGithub(progress: vscode.Progress<{ message?: s
     }
 
     try {
+        let commitMessage = await vscode.window.showInputBox({
+            ignoreFocusOut: true,
+            placeHolder: "commit message"
+        });
+
+        if (commitMessage === undefined) {
+            vscode.window.showInformationMessage("Canceled upload of configuration");
+            return;
+        }
+
         progress.report({message: "get AppData path..."});
         let vscodePath = path.join(getAppdataPath(), "Code", "User");
         let settingsPath = path.join(vscodePath, "settings.json");
@@ -145,18 +154,7 @@ async function uploadPreferencesToGithub(progress: vscode.Progress<{ message?: s
             }
         }
 
-        // find latest commit message
-        progress.report({message: "calculating commit message..."});
-        let commitMessage = "new version! " + new Date().toISOString();
-        try {
-            let res = await git.log(["-1", "--pretty=%B"]);
-            let msg = res.all[0].hash;
-            commitMessage = "" + (Number(msg) + 1);
-            if (commitMessage === "NaN") {
-                commitMessage = "0";
-            }
-        } catch (e) {}
-        
+        // commit and push
         progress.report({message: "commit files..."});
         await git.add("./*");
         await git.commit(commitMessage);
