@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-const simpleGit = require('simple-git/promise');
+import * as simpleGit from 'simple-git/promise';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -56,7 +56,12 @@ function mkdirRec(dir: string) {
     }
 }
 
-type Config = {ok: boolean, url: string, localRep: string, pullBeforePush: boolean};
+type Config = {
+    ok: boolean,
+    url: string,
+    localRep: string,
+    pullBeforePush: boolean
+};
 
 function getConfig() : Config {
     let vscodeprefsync = vscode.workspace.getConfiguration("vscodeprefsync");
