@@ -17,19 +17,19 @@
         "commands": [
             {
                 "command": "extension.uploadSettingsToGithub",
-                "title": "Upload your Settings and Keybindings to a GitHub repository"
+                "title": "prefsync: Upload your Settings and Keybindings to a GitHub repository"
             },
             {
                 "command": "extension.downloadSettingsFromGithub",
-                "title": "Download Settings and Keybindings from a GitHub repository"
+                "title": "prefsync: Download Settings and Keybindings from a GitHub repository"
             },
             {
                 "command": "extension.checkForSettingsChanges",
-                "title": "Check for changes in current Settings"
+                "title": "prefsync: Check for changes in current Settings"
             },
             {
-                "command": "extension.quickCheckForSettingsChanges",
-                "title": "Quick Check for changes in current Settings (without pulling)"
+                "command": "extension.revertLocalSettings",
+                "title": "prefsync: Revert local settings to remote"
             }
         ],
         "configuration": {
@@ -50,6 +50,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Pull from the remote repository before saving settings"
+                },
+                "vscodeprefsync.automaticallyOpenChanges": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Open the result from a git diff in an editor window after downloading settings or checking for changes"
                 }
             }
         }
