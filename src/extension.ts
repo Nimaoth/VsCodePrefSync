@@ -11,6 +11,7 @@ import { getAppdataPath, mkdirRec } from "./utility_functions";
 const uploadCommand = 'extension.uploadSettingsToGithub';
 const downloadCommand = 'extension.downloadSettingsFromGithub';
 const changesCommand = 'extension.checkForSettingsChanges';
+const quickChangesCommand = 'extension.quickCheckForSettingsChanges';
 
 const settingsFile = "settings.json";
 const keybindingsFile = "keybindings.json";
@@ -18,28 +19,30 @@ const keybindingsFile = "keybindings.json";
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-    vscode.window.showInformationMessage(`Activating VsCodePrefSync extension`);
+    registerCommand(context, uploadCommand, 'Upload settings', uploadSettingsToGithub);
+    registerCommand(context, downloadCommand, 'Download settings', downloadSettingsFromGithub);
+    registerCommand(context, changesCommand, "Check for changes", checkForChanges(true));
+    registerCommand(context, quickChangesCommand, "Quick Check for changes", checkForChanges(false));
 
-    let upload = registerCommand(uploadCommand, 'Upload settings', uploadSettingsToGithub);
-    let download = registerCommand(downloadCommand, 'Download settings', downloadSettingsFromGithub);
-    let checkForChangesDis = registerCommand(changesCommand, "Check for changes", checkForChanges);
-
-    context.subscriptions.push(upload, download, checkForChangesDis);
 
     vscode.commands.executeCommand(changesCommand);
 }
 
 type ProgressType = vscode.Progress<{ message?: string; increment?: number }>;
 
-function registerCommand(id: string, name: string, method: (prog: ProgressType) => Promise<void>): vscode.Disposable {
-    return vscode.commands.registerCommand(id, () => {
+function registerCommand(context: vscode.ExtensionContext, id: string, name: string, method: (prog: ProgressType) => Promise<void>): vscode.Disposable {
+    const command = vscode.commands.registerCommand(id, () => {
         vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: name
         }, p => {
             return method(p);
         });
-    })
+    });
+
+    context.subscriptions.push(command);
+
+    return command;
 }
 
 
@@ -81,7 +84,7 @@ function getConfig() : Config {
     return config;
 }
 
-async function checkOutRepository(config: Config, progress: ProgressType | null) : Promise<simpleGit.SimpleGit> {
+async function checkOutRepository(config: Config, progress: ProgressType | null, pull: boolean = true) : Promise<simpleGit.SimpleGit> {
     let parent = path.dirname(config.localRep);
     if (!fs.existsSync(parent)) {
         if (progress !== null) {
@@ -106,7 +109,7 @@ async function checkOutRepository(config: Config, progress: ProgressType | null)
     // change working dir
     await git.cwd(config.localRep);
 
-    if (!justCloned) {
+    if (!justCloned && pull) {
         if (progress !== null) {
             progress.report({message: "pull..."});
         }
@@ -142,58 +145,59 @@ function copyRepFilesToLocal(config: Config, progress: ProgressType | null) {
                     path.join(vscodePath,       keybindingsFile));
 }
 
-async function checkForChanges(progress: ProgressType) {
-    const config = getConfig();
-    if (!config.ok) {
-        return;
-    }
-
-    try {
-        progress.report({message: "Checking for changes in settings..."});
-        
-        const git = await checkOutRepository(config, progress);
-        copyLocalFilesToRep(config, progress);
-
-        // check if there are changes, if not, return
-        const changes = await git.raw(["status", "-s"]);
-        if (changes === null) {
-            vscode.window.showInformationMessage("Check for changes: Settings are up to date.");
+function checkForChanges(pull: boolean) : (_: ProgressType) => Promise<void> {
+    return async function(progress: ProgressType) {
+        const config = getConfig();
+        if (!config.ok) {
+            return;
         }
-        else {
-            const lines = changes.split(/\n/);
-            let files: string[] = [];
-            for (const line of lines) {
-                const parts = line.trim().split(/\s+/);
-                if (parts.length === 2) {
-                    files.push(parts[1]);
+
+        try {
+            progress.report({message: "Checking for changes in settings..."});
+
+            const git = await checkOutRepository(config, progress, pull);
+            copyLocalFilesToRep(config, progress);
+
+            // check if there are changes, if not, return
+            progress.report({message: "search for changes..."});
+            const changes = await git.raw(["status", "-s"]);
+            if (changes === null) {
+                vscode.window.showInformationMessage("Check for changes: Settings are up to date.");
+            }
+            else {
+                const lines = changes.split(/\n/);
+                let files: string[] = [];
+                for (const line of lines) {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts.length === 2) {
+                        files.push(parts[1]);
+                    }
+                }
+
+                files.push("Show Changes");
+
+                const selection = await vscode.window.showInformationMessage("Check for changes: Settings have changes.", ...files);
+                switch (selection) {
+                case "Show Changes":
+                    progress.report({message: "diffing..."});
+                    const diff = await git.diff();
+                    const doc = await vscode.workspace.openTextDocument({ content: diff });
+                    vscode.window.showTextDocument(doc);
+                    break;
+
+                case "settings.json":
+                    vscode.commands.executeCommand('workbench.action.openSettings');
+                    break;
+
+                case "keybindings.json":
+                    vscode.commands.executeCommand('workbench.action.openGlobalKeybindings');
+                    break;
                 }
             }
-
-            files.push("Show Changes");
-
-            const selection = await vscode.window.showInformationMessage("Check for changes: Settings have changes.", ...files);
-            switch (selection) {
-            case "Show Changes":
-                progress.report({message: "diffing..."});
-                const diff = await git.diff();
-                const doc = await vscode.workspace.openTextDocument({
-                    content: diff
-                });
-                vscode.window.showTextDocument(doc);
-                break;
-
-            case "settings.json": 
-                vscode.commands.executeCommand('workbench.action.openSettings');
-                break;
-
-            case "keybindings.json": 
-                vscode.commands.executeCommand('workbench.action.openGlobalKeybindings');
-                break;
-            }
+        } catch (e) {
+            vscode.window.showErrorMessage(`Failed to check for changes to repository '${config.url}': ${e}`);
         }
-    } catch (e) {
-        vscode.window.showErrorMessage(`Failed to check for changes to repository '${config.url}': ${e}`);
-    }
+    };
 }
 
 async function uploadSettingsToGithub(progress: ProgressType) {
@@ -213,7 +217,7 @@ async function uploadSettingsToGithub(progress: ProgressType) {
             return;
         }
 
-        const git = await checkOutRepository(config, progress);
+        const git = await checkOutRepository(config, progress, true);
         copyLocalFilesToRep(config, progress);
 
         // check if there are changes, if not, return
@@ -247,7 +251,7 @@ async function downloadSettingsFromGithub(progress: ProgressType) {
     }
 
     try {
-        await checkOutRepository(config, progress);
+        await checkOutRepository(config, progress, true);
         copyRepFilesToLocal(config, progress);
         vscode.window.showInformationMessage(`Finished downloading settings from git repository '${config.url}'`);
     }

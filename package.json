@@ -26,6 +26,10 @@
             {
                 "command": "extension.checkForSettingsChanges",
                 "title": "Check for changes in current Settings"
+            },
+            {
+                "command": "extension.quickCheckForSettingsChanges",
+                "title": "Quick Check for changes in current Settings (without pulling)"
             }
         ],
         "configuration": {
