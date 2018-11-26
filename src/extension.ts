@@ -70,8 +70,8 @@ async function showDiffInWindow(text: string, status: RepositoryStatus) {
     switch (status) {
         case null: break;
         case undefined: break;
-        default: title = "Diff: " + RepositoryStatus[status]
-    };
+        default: title = "Diff: " + RepositoryStatus[status];
+    }
     const webwindow = vscode.window.createWebviewPanel("diff", title, {
         preserveFocus: true,
         viewColumn: vscode.ViewColumn.Active
@@ -178,7 +178,7 @@ async function getLocalRepository(config: Config, progress: ProgressType | null)
         if (progress !== null) {
             progress.report({message: "fetching..."});
         }
-        const fetchResult = await git.fetch();
+        await git.fetch();
     }
 
     return git;
@@ -363,7 +363,7 @@ async function downloadSettingsFromGithub(config: Config, progress: ProgressType
 
         // merge
         progress.report({message: "merging..."});
-        const mergeResult = await git.merge(["origin/master"]);
+        await git.merge(["origin/master"]);
         copyRepFilesToLocal(config, progress);
 
         vscode.window.showInformationMessage(`[Download settings] Finished downloading settings from git repository '${config.url}': ${incomingChangeMessage}`);
