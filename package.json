@@ -10,19 +10,22 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.uploadPreferencesToGithub",
-        "onCommand:extension.downloadPreferencesFromGithub"
+        "*"
     ],
     "main": "./out/extension",
     "contributes": {
         "commands": [
             {
-                "command": "extension.uploadPreferencesToGithub",
-                "title": "Upload your Preferences and Keybindings to a GitHub repository"
+                "command": "extension.uploadSettingsToGithub",
+                "title": "Upload your Settings and Keybindings to a GitHub repository"
             },
             {
-                "command": "extension.downloadPreferencesFromGithub",
-                "title": "Download Preferences and Keybindings from a GitHub repository"
+                "command": "extension.downloadSettingsFromGithub",
+                "title": "Download Settings and Keybindings from a GitHub repository"
+            },
+            {
+                "command": "extension.checkForSettingsChanges",
+                "title": "Check for changes in current Settings"
             }
         ],
         "configuration": {
