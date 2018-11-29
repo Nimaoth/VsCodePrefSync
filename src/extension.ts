@@ -240,7 +240,7 @@ async function checkForChanges(config: Config, progress: ProgressType) {
 
     case RepositoryStatus.Behind:
         if (config.openChanges) {
-            const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
+            const diff = await git.diff(["--src-prefix=local/", "--dst-prefix=remote/", "@", "@{u}"]);
             await showDiffInWindow(diff, status);
         }
         vscode.window.showInformationMessage("[Check for changes] There are changes on the remote repository.");
@@ -355,7 +355,7 @@ async function downloadSettingsFromGithub(config: Config, progress: ProgressType
 
     case RepositoryStatus.Behind:
         if (config.openChanges) {
-            const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
+            const diff = await git.diff(["--src-prefix=local/", "--dst-prefix=remote/", "@", "@{u}"]);
             await showDiffInWindow(diff, status);
         }
 
