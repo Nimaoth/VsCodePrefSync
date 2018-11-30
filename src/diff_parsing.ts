@@ -1,6 +1,4 @@
 import { RepositoryStatus } from './extension';
-import { Uri } from 'vscode';
-import * as path from 'path';
 
 export interface DiffChange {
     srcRange: { start: number, lines: number | null };
