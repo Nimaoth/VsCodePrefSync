@@ -157,9 +157,46 @@ export function diffResultToHtml(diffs: DiffResult[]) : string {
         </style>
     </head>
     <body>
+        <button id="bCheckAgain">Check Again</button>
+        <button id="bUpload">Upload</button>
+        <button id="bDownload">Download</button>
+        <button id="bRevert">Revert</button>
         <ul>
             ${files}
         </ul>
+
+        <script>
+            let bCheckAgain = document.getElementById("bCheckAgain");
+            let bUpload = document.getElementById("bUpload");
+            let bDownload = document.getElementById("bDownload");
+            let bRevert = document.getElementById("bRevert");
+
+            const vscode = acquireVsCodeApi();
+
+            bCheckAgain.addEventListener('click', () => {
+                vscode.postMessage({
+                    command: 'check_again'
+                });
+            });
+
+            bDownload.addEventListener('click', () => {
+                vscode.postMessage({
+                    command: 'download'
+                });
+            });
+
+            bUpload.addEventListener('click', () => {
+                vscode.postMessage({
+                    command: 'upload'
+                });
+            });
+
+            bRevert.addEventListener('click', () => {
+                vscode.postMessage({
+                    command: 'revert'
+                });
+            });
+        </script>
     </body>
     </html>`;
 }

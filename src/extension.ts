@@ -19,10 +19,13 @@ const keybindingsFile = "keybindings.json";
 
 
 let channel: vscode.OutputChannel;
+let changesWebWindow : vscode.WebviewPanel | null = null;
+let extContext : vscode.ExtensionContext;
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+    extContext = context;
     channel = vscode.window.createOutputChannel("prefsync: git diff");
 
     registerCommand(context, uploadCommand, 'Upload settings', uploadSettingsToGithub);
@@ -72,12 +75,39 @@ async function showDiffInWindow(text: string, status: RepositoryStatus) {
         case undefined: break;
         default: title = "Diff: " + RepositoryStatus[status];
     }
-    const webwindow = vscode.window.createWebviewPanel("diff", title, {
-        preserveFocus: true,
-        viewColumn: vscode.ViewColumn.Active
-    }, {});
 
-    webwindow.webview.html = diffResultToHtml(parseDiffOutput(text));
+    if (changesWebWindow === null) {
+        changesWebWindow = vscode.window.createWebviewPanel("diff", title, {
+            preserveFocus: true,
+            viewColumn: vscode.ViewColumn.Active
+        }, {
+            enableScripts: true
+        });
+        changesWebWindow.onDidDispose(() => {
+            changesWebWindow = null;
+        }, null, extContext.subscriptions);
+
+        changesWebWindow.webview.onDidReceiveMessage(m => {
+            switch (m.command) {
+                case 'check_again':
+                    vscode.commands.executeCommand(changesCommand);
+                    break;
+                case 'upload':
+                    vscode.commands.executeCommand(uploadCommand);
+                    break;
+                case 'download':
+                    vscode.commands.executeCommand(downloadCommand);
+                    break;
+                case 'revert':
+                    vscode.commands.executeCommand(revertLocalCommand);
+                    break;
+            }
+        });
+    }
+
+    changesWebWindow.title = title;
+    changesWebWindow.webview.html = diffResultToHtml(parseDiffOutput(text));
+    changesWebWindow.reveal();
 }
 
 enum RepositoryStatus {
