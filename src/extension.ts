@@ -7,7 +7,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as simpleGit from 'simple-git/promise';
 import { getAppdataPath, mkdirRec } from './utility_functions';
-import { parseDiffOutput, diffResultToHtml } from './diff_parsing';
+import { diffResultToHtml } from './diff_parsing';
 
 const uploadCommand = 'extension.uploadSettingsToGithub';
 const downloadCommand = 'extension.downloadSettingsFromGithub';
@@ -19,11 +19,9 @@ const keybindingsFile = "keybindings.json";
 
 
 let channel: vscode.OutputChannel;
-let changesWebWindow : vscode.WebviewPanel | null = null;
+let prefsyncWindow : vscode.WebviewPanel | null = null;
 let extContext : vscode.ExtensionContext;
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
     extContext = context;
     channel = vscode.window.createOutputChannel("prefsync: git diff");
@@ -49,7 +47,7 @@ function registerCommand(context: vscode.ExtensionContext, id: string, name: str
             if (!config.ok) {
                 return;
             }
-        
+
             try {
                 await method(config, p);
             } catch (e) {
@@ -63,31 +61,24 @@ function registerCommand(context: vscode.ExtensionContext, id: string, name: str
     return command;
 }
 
-async function showDiffInWindow(text: string, status: RepositoryStatus) {
-    // show raw diff
-    channel.clear();
-    channel.append(text);
+function updatePrefsSyncWindow(title: string | null, message: string) {
+    let assetsPath = vscode.Uri.file(path.join(extContext.extensionPath, 'assets'));
 
-    // show nice diff
-    let title = "Diff";
-    switch (status) {
-        case null: break;
-        case undefined: break;
-        default: title = "Diff: " + RepositoryStatus[status];
-    }
-
-    if (changesWebWindow === null) {
-        changesWebWindow = vscode.window.createWebviewPanel("diff", title, {
+    if (prefsyncWindow === null) {
+        prefsyncWindow = vscode.window.createWebviewPanel("PrefsSync", "PrefsSync", {
             preserveFocus: true,
             viewColumn: vscode.ViewColumn.Active
         }, {
-            enableScripts: true
+            enableScripts: true,
+            localResourceRoots: [
+                assetsPath
+            ]
         });
-        changesWebWindow.onDidDispose(() => {
-            changesWebWindow = null;
+        prefsyncWindow.onDidDispose(() => {
+            prefsyncWindow = null;
         }, null, extContext.subscriptions);
 
-        changesWebWindow.webview.onDidReceiveMessage(m => {
+        prefsyncWindow.webview.onDidReceiveMessage(m => {
             switch (m.command) {
                 case 'check_again':
                     vscode.commands.executeCommand(changesCommand);
@@ -105,12 +96,50 @@ async function showDiffInWindow(text: string, status: RepositoryStatus) {
         });
     }
 
-    changesWebWindow.title = title;
-    changesWebWindow.webview.html = diffResultToHtml(parseDiffOutput(text));
-    changesWebWindow.reveal();
+    assetsPath = assetsPath.with({ scheme: 'vscode-resource' });
+
+    prefsyncWindow.title = title || "PrefsSync";
+    prefsyncWindow.webview.html = `<!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="utf-8" />
+            <link rel="stylesheet" type="text/css" media="screen" href="${path.join(assetsPath.toString(), 'diff_view/diff_view.css')}" />
+        </head>
+        <body>
+            <button type="button" id="bCheckAgain">Check Again</button>
+            <button type="button" id="bUpload">Upload</button>
+            <button type="button" id="bDownload">Download</button>
+            <button type="button" id="bRevert">Revert</button>
+
+            <div>
+                ${message}
+            </div>
+
+            <span id="test"></span>
+
+            <script src="${path.join(assetsPath.toString(), 'diff_view/diff_view.js')}"></script>
+        </body>
+    </html>`;
+    prefsyncWindow.reveal();
 }
 
-enum RepositoryStatus {
+function showDiff(text: string, status: RepositoryStatus) {
+    // show raw diff
+    channel.clear();
+    channel.append(text);
+
+    // show nice diff
+    let title = "Diff";
+    switch (status) {
+        case null: break;
+        case undefined: break;
+        default: title = "Diff: " + RepositoryStatus[status];
+    }
+
+    updatePrefsSyncWindow(title, diffResultToHtml(text, status));
+}
+
+export enum RepositoryStatus {
     UpToDate,
     Behind,
     Ahead,
@@ -247,6 +276,10 @@ async function revertLocalChanges(config: Config, progress: ProgressType) {
     await git.reset(["--hard", "@{u}"]);
 
     copyRepFilesToLocal(config, progress);
+
+    if (prefsyncWindow !== null) {
+        updatePrefsSyncWindow(null, "Your settings are up to date.");
+    }
 }
 
 async function checkForChanges(config: Config, progress: ProgressType) {
@@ -266,12 +299,15 @@ async function checkForChanges(config: Config, progress: ProgressType) {
     switch (status) {
     case RepositoryStatus.UpToDate:
         vscode.window.showInformationMessage("[Check for changes] There are no local changes.");
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Your settings are up to date.");
+        }
         break;
 
     case RepositoryStatus.Behind:
         if (config.openChanges) {
             const diff = await git.diff(["--src-prefix=local/", "--dst-prefix=remote/", "@", "@{u}"]);
-            await showDiffInWindow(diff, status);
+            showDiff(diff, status);
         }
         vscode.window.showInformationMessage("[Check for changes] There are changes on the remote repository.");
         break;
@@ -279,7 +315,7 @@ async function checkForChanges(config: Config, progress: ProgressType) {
     case RepositoryStatus.Ahead:
         if (config.openChanges) {
             const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
-            await showDiffInWindow(diff, status);
+            showDiff(diff, status);
         }
         vscode.window.showInformationMessage("[Check for changes] There are local changes.");
         await git.reset(["HEAD~1"]);
@@ -288,9 +324,7 @@ async function checkForChanges(config: Config, progress: ProgressType) {
     case RepositoryStatus.Diverged:
         if (config.openChanges) {
             const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
-
-
-            showDiffInWindow(diff, status);
+            showDiff(diff, status);
         }
         vscode.window.showInformationMessage("[Check for changes] There are changes on both the local and remote repository. Please resolve these issues manually.");
         await git.reset(["HEAD~1"]);
@@ -315,14 +349,23 @@ async function uploadSettingsToGithub(config: Config, progress: ProgressType) {
     switch (status) {
     case RepositoryStatus.UpToDate:
         vscode.window.showInformationMessage("[Upload settings] There are no local changes.");
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Your settings are up to date.");
+        }
         return;
 
     case RepositoryStatus.Behind:
         vscode.window.showInformationMessage("[Upload settings] There are no local changes, but remote changes. Consider downloading the newest settings.");
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "There are no local changes, but remote changes. Consider downloading the newest settings.");
+        }
         return;
 
     case RepositoryStatus.Diverged: {
-        vscode.window.showWarningMessage("Your local settings have diverged from the remote repository. Please manually merge your settings with your local repository.");
+        vscode.window.showWarningMessage("[Upload settings] Your local settings have diverged from the remote repository. Please manually merge your settings with your local repository.");
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Your local settings have diverged from the remote repository. Please manually merge your settings with your local repository.");
+        }
         await git.reset(["HEAD~1"]);
         return;
     }
@@ -330,7 +373,7 @@ async function uploadSettingsToGithub(config: Config, progress: ProgressType) {
     case RepositoryStatus.Ahead: {
         if (config.openChanges) {
             const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
-            await showDiffInWindow(diff, status);
+            await showDiff(diff, status);
         }
 
         // get commit message
@@ -352,6 +395,9 @@ async function uploadSettingsToGithub(config: Config, progress: ProgressType) {
         progress.report({message: "pushing..."});
         await git.push("origin", "master");
         vscode.window.showInformationMessage(`Finished uploading settings to git repository '${config.url}'`);
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Your settings are up to date.");
+        }
     }
     }
 }
@@ -371,22 +417,31 @@ async function downloadSettingsFromGithub(config: Config, progress: ProgressType
     switch (status) {
     case RepositoryStatus.UpToDate:
         vscode.window.showInformationMessage("[Download settings] There are no remote changes.");
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Your settings are up to date.");
+        }
         return;
 
     case RepositoryStatus.Ahead:
         vscode.window.showInformationMessage("[Download settings] There are no remote changes, but you have local changes. Consider uploading your settings.");
         await git.reset(["HEAD~1"]);
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "There are no remote changes, but you have local changes. Consider uploading your settings.");
+        }
         return;
 
     case RepositoryStatus.Diverged:
         vscode.window.showErrorMessage("[Download settings] Your local settings have diverged from the remote repository. There is nothing I can do.");
         await git.reset(["HEAD~1"]);
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Your local settings have diverged from the remote repository. There is nothing I can do.");
+        }
         return;
 
     case RepositoryStatus.Behind:
         if (config.openChanges) {
             const diff = await git.diff(["--src-prefix=local/", "--dst-prefix=remote/", "@", "@{u}"]);
-            await showDiffInWindow(diff, status);
+            await showDiff(diff, status);
         }
 
         const incomingChangeMessage = await git.raw(["log", "@..@{u}", "--pretty=format:%s"]);
@@ -397,6 +452,9 @@ async function downloadSettingsFromGithub(config: Config, progress: ProgressType
         copyRepFilesToLocal(config, progress);
 
         vscode.window.showInformationMessage(`[Download settings] Finished downloading settings from git repository '${config.url}': ${incomingChangeMessage}`);
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Your settings are up to date.");
+        }
         break;
     }
 }

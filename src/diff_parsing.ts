@@ -1,3 +1,7 @@
+import { RepositoryStatus } from './extension';
+import { Uri } from 'vscode';
+import * as path from 'path';
+
 export interface DiffChange {
     srcRange: { start: number, lines: number | null };
     dstRange: { start: number, lines: number | null };
@@ -63,7 +67,7 @@ export function parseDiffOutput(diff: string) : DiffResult[] {
     return result;
 }
 
-export function diffResultToHtml(diffs: DiffResult[]) : string {
+function createFilesList(diffs: DiffResult[]) : string {
     let files = "";
     for (const diff of diffs) {
         let changes = "";
@@ -104,99 +108,22 @@ export function diffResultToHtml(diffs: DiffResult[]) : string {
         </li>`;
     }
 
+    return `<ul>${files}</ul>`;
+}
 
+export function diffResultToHtml(diffOutput: string, status: RepositoryStatus) : string {
+    let diffs = parseDiffOutput(diffOutput);
 
-    return `<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <style>
-            .addition {
-                color: lightgreen;
-            }
-            .removal {
-                color: red;
-            }
-            .regular {
-                
-            }
+    let files = "";
+    if (diffs.length === 0) {
+        switch (status) {
+        case RepositoryStatus.UpToDate:
+            files = "<h1>Your repository is up to date.</h1>";
+            break;
+        }
+    } else {
+        files = createFilesList(diffs);
+    }
 
-            .code {
-                padding: 5px;
-                border: 1px solid grey;
-            }
-
-            code {
-                white-space: pre;
-            }
-
-            .file {
-                
-            }
-
-            .change {
-
-            }
-
-            .files {
-                margin: 30px 0;
-            }
-
-            .changes {
-                margin: 10px 0;
-            }
-
-            ul {
-                list-style: none;
-            }
-
-            * {
-                font-family: monospace;
-                font-size: 20px;
-            }
-        </style>
-    </head>
-    <body>
-        <button id="bCheckAgain">Check Again</button>
-        <button id="bUpload">Upload</button>
-        <button id="bDownload">Download</button>
-        <button id="bRevert">Revert</button>
-        <ul>
-            ${files}
-        </ul>
-
-        <script>
-            let bCheckAgain = document.getElementById("bCheckAgain");
-            let bUpload = document.getElementById("bUpload");
-            let bDownload = document.getElementById("bDownload");
-            let bRevert = document.getElementById("bRevert");
-
-            const vscode = acquireVsCodeApi();
-
-            bCheckAgain.addEventListener('click', () => {
-                vscode.postMessage({
-                    command: 'check_again'
-                });
-            });
-
-            bDownload.addEventListener('click', () => {
-                vscode.postMessage({
-                    command: 'download'
-                });
-            });
-
-            bUpload.addEventListener('click', () => {
-                vscode.postMessage({
-                    command: 'upload'
-                });
-            });
-
-            bRevert.addEventListener('click', () => {
-                vscode.postMessage({
-                    command: 'revert'
-                });
-            });
-        </script>
-    </body>
-    </html>`;
+    return files;
 }
