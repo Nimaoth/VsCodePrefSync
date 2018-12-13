@@ -1,7 +1,11 @@
 # Change Log
 All notable changes to the "vscodeprefsync" extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+## [1.0.0] - 2018-12-13
+Initial Release
 
-## [Unreleased]
-- Initial release
+## [1.0.1] - 2018-12-13
+### Changed
+- dist folder will no longer be published
+- Added CHANGELOG.md
+- Made extension description shorter

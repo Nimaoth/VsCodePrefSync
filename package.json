@@ -1,8 +1,8 @@
 {
     "name": "vscodeprefsync",
     "displayName": "VsCodePrefSync",
-    "description": "Visual Studio Code extension that allows you to upload and download you user settings and key bindigs to a get repository",
-    "version": "1.0.0",
+    "description": "This extension allows you to synchronize your user settings and key bindings",
+    "version": "1.0.1",
     "publisher": "Nimaoth",
     "repository": {
         "type": "git",
