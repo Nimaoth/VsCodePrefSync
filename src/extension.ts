@@ -156,7 +156,6 @@ type Config = {
     ok: boolean,
     url: string,
     localRep: string,
-    pullBeforePush: boolean,
     openChanges: boolean
 };
 
@@ -167,7 +166,6 @@ function getConfig() : Config {
         ok: true,
         url: "",
         localRep: "",
-        pullBeforePush: true,
         openChanges: false
     };
 
@@ -180,12 +178,6 @@ function getConfig() : Config {
     config.localRep = vscodeprefsync.get("localRepository") as string;
     if (config.localRep === null || config.localRep === undefined || config.localRep === "") {
         vscode.window.showErrorMessage("Please provide the setting 'vscodeprefsync.localRepository'");
-        config.ok = false;
-    }
-
-    config.pullBeforePush = vscodeprefsync.get("pullBeforePush") as boolean;
-    if (typeof(config.pullBeforePush) !== "boolean") {
-        vscode.window.showErrorMessage("Please provide the setting 'vscodeprefsync.pullBeforePush'");
         config.ok = false;
     }
 

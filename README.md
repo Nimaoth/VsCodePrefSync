@@ -15,8 +15,6 @@ This extension adds the following commands:
 
 This extension contributes the following settings:
 
-* `vscodeprefsync.pullBeforePush`: if true, the extension pulls before pushing changes
-
 
 * `vscodeprefsync.repositoryUrl`: Url of the git repository to use for syncing settings
 * `vscodeprefsync.localRepository`: Where to check out the repository
