@@ -9,8 +9,8 @@ import * as simpleGit from 'simple-git/promise';
 import { getAppdataPath, mkdirRec } from './utility_functions';
 import { diffResultToHtml } from './diff_parsing';
 
-const uploadCommand = 'extension.uploadSettingsToGithub';
-const downloadCommand = 'extension.downloadSettingsFromGithub';
+const uploadCommand = 'extension.uploadSettings';
+const downloadCommand = 'extension.downloadSettings';
 const changesCommand = 'extension.checkForSettingsChanges';
 const revertLocalCommand = 'extension.revertLocalSettings';
 
@@ -26,8 +26,8 @@ export function activate(context: vscode.ExtensionContext) {
     extContext = context;
     channel = vscode.window.createOutputChannel("prefsync: git diff");
 
-    registerCommand(context, uploadCommand, 'Upload settings', uploadSettingsToGithub);
-    registerCommand(context, downloadCommand, 'Download settings', downloadSettingsFromGithub);
+    registerCommand(context, uploadCommand, 'Upload settings', uploadSettings);
+    registerCommand(context, downloadCommand, 'Download settings', downloadSettings);
     registerCommand(context, changesCommand, "Check for changes", checkForChanges);
     registerCommand(context, revertLocalCommand, "Revert changes", revertLocalChanges);
 
@@ -62,6 +62,12 @@ function registerCommand(context: vscode.ExtensionContext, id: string, name: str
 }
 
 function updatePrefsSyncWindow(title: string | null, message: string) {
+    const vscodeprefsync = vscode.workspace.getConfiguration("vscodeprefsync");
+    const openChangesInWindow = vscodeprefsync.get("automaticallyOpenChanges");
+    if (openChangesInWindow !== true) {
+        return;
+    }
+
     let assetsPath = vscode.Uri.file(path.join(extContext.extensionPath, 'assets'));
 
     if (prefsyncWindow === null) {
@@ -332,7 +338,7 @@ async function checkForChanges(config: Config, progress: ProgressType) {
     }
 }
 
-async function uploadSettingsToGithub(config: Config, progress: ProgressType) {
+async function uploadSettings(config: Config, progress: ProgressType) {
     const git = await getLocalRepository(config, progress);
 
     progress.report({message: "Syncing VSCode folder with local repository..."});
@@ -402,7 +408,7 @@ async function uploadSettingsToGithub(config: Config, progress: ProgressType) {
     }
 }
 
-async function downloadSettingsFromGithub(config: Config, progress: ProgressType) {
+async function downloadSettings(config: Config, progress: ProgressType) {
     const git = await getLocalRepository(config, progress);
 
     progress.report({message: "Syncing VSCode folder with local repository..."});

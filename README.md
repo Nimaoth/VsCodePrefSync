@@ -1,20 +1,17 @@
 # VsCodePrefSync
 
-Visual Studio Code extension that allows you to upload and download you user settings and key bindigs to a get repository
+Visual Studio Code extension that allows you to synchronize you user settings and key bindings using git
 
 
 ## Features
 
-This extension adds two commands:
-- Upload your Preferences and Keybindings to a git repository (`extension.uploadPreferencesToGithub`)
-- Download Preferences and Keybindings from a git repository (`extension.downloadPreferencesFromGithub`)
-
-The upload command takes your global user settings (settings.json) and key bindings (keybindings.json), copies them to a local copy of your specified git repository and then commits and pushes this repository.
-
-The download command clones the remote repository (or just performs a `git pull` if the repository was already cloned), and then copies the `settings.json` and `keybindings.json` to your Visual Studio Code directory.
+This extension adds the following commands:
+- prefsync: Upload your settings and keybindings to a git repository (`extension.uploadSettings`)
+- prefsync: Download settings and keybindings from a git repository (`extension.downloadSettings`)
+- prefsync: Check for changes in current Settings (`extension.checkForSettingsChanges`)
+- prefsync: Revert local settings to remote (`extension.revertLocalSettings`)
 
 ## Extension Settings
-
 
 This extension contributes the following settings:
 
@@ -22,13 +19,7 @@ This extension contributes the following settings:
 * `vscodeprefsync.localRepository`: path where the extension shoud clone the remote repository
 * `vscodeprefsync.pullBeforePush`: if true, the extension pulls before pushing changes
 
-## Known Issues
 
-So far nothing.
-
-## Release Notes
-
-
-### 0.0.1
-
-Initial release of VsCodePrefSync
+* `vscodeprefsync.repositoryUrl`: Url of the git repository to use for syncing settings
+* `vscodeprefsync.localRepository`: Where to check out the repository
+* `vscodeprefsync.automaticallyOpenChanges`: Open the result from a git diff in an editor window after downloading settings or checking for changes

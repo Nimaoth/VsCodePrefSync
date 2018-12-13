@@ -2,7 +2,7 @@
     "name": "vscodeprefsync",
     "displayName": "VsCodePrefSync",
     "description": "Visual Studio Code extension that allows you to upload and download you user settings and key bindigs to a get repository",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "engines": {
         "vscode": "^1.29.0"
     },
@@ -16,12 +16,12 @@
     "contributes": {
         "commands": [
             {
-                "command": "extension.uploadSettingsToGithub",
-                "title": "prefsync: Upload your Settings and Keybindings to a GitHub repository"
+                "command": "extension.uploadSettings",
+                "title": "prefsync: Upload your settings and keybindings to a git repository"
             },
             {
-                "command": "extension.downloadSettingsFromGithub",
-                "title": "prefsync: Download Settings and Keybindings from a GitHub repository"
+                "command": "extension.downloadSettings",
+                "title": "prefsync: Download settings and keybindings from a git repository"
             },
             {
                 "command": "extension.checkForSettingsChanges",
@@ -45,11 +45,6 @@
                     "type": "string",
                     "default": null,
                     "description": "Where to check out the repository"
-                },
-                "vscodeprefsync.pullBeforePush": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Pull from the remote repository before saving settings"
                 },
                 "vscodeprefsync.automaticallyOpenChanges": {
                     "type": "boolean",
