@@ -15,8 +15,6 @@ This extension adds the following commands:
 
 This extension contributes the following settings:
 
-* `vscodeprefsync.repositoryUrl`: url of the remote repository
-* `vscodeprefsync.localRepository`: path where the extension shoud clone the remote repository
 * `vscodeprefsync.pullBeforePush`: if true, the extension pulls before pushing changes
 
 
