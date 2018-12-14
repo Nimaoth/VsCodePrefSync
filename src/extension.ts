@@ -31,29 +31,25 @@ export function activate(context: vscode.ExtensionContext) {
     registerCommand(context, changesCommand, "Check for changes", checkForChanges);
     registerCommand(context, revertLocalCommand, "Revert changes", revertLocalChanges);
 
-
     vscode.commands.executeCommand(changesCommand);
 }
 
 type ProgressType = vscode.Progress<{ message?: string; increment?: number }>;
 
 function registerCommand(context: vscode.ExtensionContext, id: string, name: string, method: (config: Config, prog: ProgressType) => Promise<void>): vscode.Disposable {
-    const command = vscode.commands.registerCommand(id, () => {
-        vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: name
-        }, async function(p) {
-            const config = getConfig();
-            if (!config.ok) {
-                return;
-            }
+    const command = vscode.commands.registerCommand(id, async () => {
+        const config = getConfig();
+        if (!config.ok) {
+            return;
+        }
 
-            try {
-                await method(config, p);
-            } catch (e) {
-                vscode.window.showErrorMessage(`[${name}] Error occured: ${e}`);
-            }
-        });
+        try {
+            await method(config, {
+                report: function() {}
+            });
+        } catch (e) {
+            vscode.window.showErrorMessage(`[${name}] Error occured: ${e}`);
+        }
     });
 
     context.subscriptions.push(command);
@@ -156,7 +152,8 @@ type Config = {
     ok: boolean,
     url: string,
     localRep: string,
-    openChanges: boolean
+    openChanges: boolean,
+    project: string | null
 };
 
 function getConfig() : Config {
@@ -165,8 +162,9 @@ function getConfig() : Config {
     let config: Config = {
         ok: true,
         url: "",
-        localRep: "",
-        openChanges: false
+        localRep: path.join(extContext.extensionPath, "repository"),
+        openChanges: false,
+        project: null
     };
 
     config.url = vscodeprefsync.get("repositoryUrl") as string;
@@ -175,10 +173,17 @@ function getConfig() : Config {
         config.ok = false;
     }
 
-    config.localRep = vscodeprefsync.get("localRepository") as string;
-    if (config.localRep === null || config.localRep === undefined || config.localRep === "") {
-        vscode.window.showErrorMessage("Please provide the setting 'vscodeprefsync.localRepository'");
-        config.ok = false;
+    // config.localRep = vscodeprefsync.get("localRepository") as string;
+    // if (config.localRep === null || config.localRep === undefined || config.localRep === "") {
+    //     vscode.window.showErrorMessage("Please provide the setting 'vscodeprefsync.localRepository'");
+    //     config.ok = false;
+    // }
+
+    const project = vscodeprefsync.get<string|null>("project");
+    if (project === undefined) {
+        config.project = null; 
+    } else {
+        config.project = project;
     }
 
     config.openChanges = vscodeprefsync.get("automaticallyOpenChanges") as boolean;
@@ -241,6 +246,19 @@ async function getLocalRepository(config: Config, progress: ProgressType | null)
     return git;
 }
 
+function copyFile(from: string, to: string) {
+    if (fs.existsSync(from)) {
+        const dir = path.dirname(to);
+        if (!fs.existsSync(dir)) {
+            mkdirRec(dir);
+        }
+        fs.copyFileSync(from, to);
+    } else if (fs.existsSync(to)) {
+        fs.unlinkSync(to);
+    }
+}
+
+// copy user settings and optional workspace settings from local machine to repository
 function copyLocalFilesToRep(config: Config, progress: ProgressType | null) {
     if (progress !== null) {
         progress.report({message: "copy files..."});
@@ -248,23 +266,45 @@ function copyLocalFilesToRep(config: Config, progress: ProgressType | null) {
 
     const vscodePath = path.join(getAppdataPath(), "Code", "User");
 
-    fs.copyFileSync(path.join(vscodePath,       settingsFile),
-                    path.join(config.localRep,  settingsFile));
-    fs.copyFileSync(path.join(vscodePath,       keybindingsFile),
-                    path.join(config.localRep,  keybindingsFile));
+    const usrSettings     = path.join(vscodePath, settingsFile);
+    const usrKeybingdings = path.join(vscodePath, keybindingsFile);
+    copyFile(usrSettings, path.join(config.localRep, settingsFile));
+    copyFile(usrKeybingdings, path.join(config.localRep, keybindingsFile));
+
+    if (config.project !== null && vscode.workspace.workspaceFolders !== undefined) {
+        const wsVscode       = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, ".vscode");
+        const wsSettings     = path.join(wsVscode, settingsFile);
+
+        const repProject     = path.join(config.localRep, config.project);
+        const repSettings    = path.join(repProject, settingsFile);
+
+        copyFile(wsSettings, repSettings);
+        copyFile(path.join(wsVscode, "test.txt"), path.join(repProject, "test.txt"));
+    }
 }
 
+// copy user settings and optional workspace settings from repository to local machine
 function copyRepFilesToLocal(config: Config, progress: ProgressType | null) {
     if (progress !== null) {
         progress.report({message: "copy files..."});
     }
 
     const vscodePath = path.join(getAppdataPath(), "Code", "User");
+    const usrSettings     = path.join(vscodePath, settingsFile);
+    const usrKeybingdings = path.join(vscodePath, keybindingsFile);
 
-    fs.copyFileSync(path.join(config.localRep,  settingsFile),
-                    path.join(vscodePath,       settingsFile));
-    fs.copyFileSync(path.join(config.localRep,  keybindingsFile),
-                    path.join(vscodePath,       keybindingsFile));
+    copyFile(path.join(config.localRep, settingsFile), usrSettings);
+    copyFile(path.join(config.localRep, keybindingsFile), usrKeybingdings);
+
+    if (config.project !== null && vscode.workspace.workspaceFolders !== undefined) {
+        const wsVscode       = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, ".vscode");
+        const wsSettings     = path.join(wsVscode, settingsFile);
+
+        const repProject     = path.join(config.localRep, config.project);
+        const repSettings    = path.join(repProject, settingsFile);
+
+        copyFile(repSettings, wsSettings);
+    }
 }
 
 async function revertLocalChanges(config: Config, progress: ProgressType) {
@@ -278,6 +318,16 @@ async function revertLocalChanges(config: Config, progress: ProgressType) {
     if (prefsyncWindow !== null) {
         updatePrefsSyncWindow(null, "Your settings are up to date.");
     }
+}
+
+async function diffLocalToRemote(git: simpleGit.SimpleGit, status: RepositoryStatus) {
+    const diff = await git.diff(["--src-prefix=local/", "--dst-prefix=remote/", "@", "@{u}"]);
+    showDiff(diff, status);
+}
+
+async function diffRemoteToLocal(git: simpleGit.SimpleGit, status: RepositoryStatus) {
+    const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
+    showDiff(diff, status);
 }
 
 async function checkForChanges(config: Config, progress: ProgressType) {
@@ -304,16 +354,14 @@ async function checkForChanges(config: Config, progress: ProgressType) {
 
     case RepositoryStatus.Behind:
         if (config.openChanges) {
-            const diff = await git.diff(["--src-prefix=local/", "--dst-prefix=remote/", "@", "@{u}"]);
-            showDiff(diff, status);
+            diffLocalToRemote(git, status);
         }
         vscode.window.showInformationMessage("[Check for changes] There are changes on the remote repository.");
         break;
 
     case RepositoryStatus.Ahead:
         if (config.openChanges) {
-            const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
-            showDiff(diff, status);
+            await diffRemoteToLocal(git, status);
         }
         vscode.window.showInformationMessage("[Check for changes] There are local changes.");
         await git.reset(["HEAD~1"]);
@@ -321,8 +369,7 @@ async function checkForChanges(config: Config, progress: ProgressType) {
 
     case RepositoryStatus.Diverged:
         if (config.openChanges) {
-            const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
-            showDiff(diff, status);
+            await diffRemoteToLocal(git, status);
         }
         vscode.window.showInformationMessage("[Check for changes] There are changes on both the local and remote repository. Please resolve these issues manually.");
         await git.reset(["HEAD~1"]);
@@ -370,8 +417,7 @@ async function uploadSettings(config: Config, progress: ProgressType) {
 
     case RepositoryStatus.Ahead: {
         if (config.openChanges) {
-            const diff = await git.diff(["--src-prefix=remote/", "--dst-prefix=local/", "@{u}", "@"]);
-            await showDiff(diff, status);
+            await diffRemoteToLocal(git, status);
         }
 
         // get commit message
@@ -438,8 +484,7 @@ async function downloadSettings(config: Config, progress: ProgressType) {
 
     case RepositoryStatus.Behind:
         if (config.openChanges) {
-            const diff = await git.diff(["--src-prefix=local/", "--dst-prefix=remote/", "@", "@{u}"]);
-            await showDiff(diff, status);
+            await diffLocalToRemote(git, status);
         }
 
         const incomingChangeMessage = await git.raw(["log", "@..@{u}", "--pretty=format:%s"]);
