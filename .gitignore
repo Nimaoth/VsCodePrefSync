@@ -4,6 +4,9 @@ node_modules
 .vscode-test/
 *.vsix
 
+# custom
+repository
+
 # Logs
 logs
 *.log
