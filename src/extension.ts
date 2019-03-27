@@ -346,7 +346,6 @@ async function checkForChanges(config: Config, progress: ProgressType) {
 
     switch (status) {
     case RepositoryStatus.UpToDate:
-        vscode.window.showInformationMessage("[Check for changes] There are no local changes.");
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "Your settings are up to date.");
         }
@@ -355,15 +354,17 @@ async function checkForChanges(config: Config, progress: ProgressType) {
     case RepositoryStatus.Behind:
         if (config.openChanges) {
             diffLocalToRemote(git, status);
+        } else {
+            vscode.window.showInformationMessage("[Check for changes] There are changes on the remote repository.");
         }
-        vscode.window.showInformationMessage("[Check for changes] There are changes on the remote repository.");
         break;
 
     case RepositoryStatus.Ahead:
         if (config.openChanges) {
             await diffRemoteToLocal(git, status);
+        } else {
+            vscode.window.showInformationMessage("[Check for changes] There are local changes.");
         }
-        vscode.window.showInformationMessage("[Check for changes] There are local changes.");
         await git.reset(["HEAD~1"]);
         break;
 
@@ -371,7 +372,9 @@ async function checkForChanges(config: Config, progress: ProgressType) {
         if (config.openChanges) {
             await diffRemoteToLocal(git, status);
         }
-        vscode.window.showInformationMessage("[Check for changes] There are changes on both the local and remote repository. Please resolve these issues manually.");
+        else {
+            vscode.window.showInformationMessage("[Check for changes] There are changes on both the local and remote repository. Please resolve these issues manually.");
+        }
         await git.reset(["HEAD~1"]);
         break;
     }
@@ -393,24 +396,24 @@ async function uploadSettings(config: Config, progress: ProgressType) {
 
     switch (status) {
     case RepositoryStatus.UpToDate:
-        vscode.window.showInformationMessage("[Upload settings] There are no local changes.");
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "Your settings are up to date.");
         }
         return;
 
     case RepositoryStatus.Behind:
-        vscode.window.showInformationMessage("[Upload settings] There are no local changes, but remote changes. Consider downloading the newest settings.");
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "There are no local changes, but remote changes. Consider downloading the newest settings.");
+        } else {
+            vscode.window.showInformationMessage("[Upload settings] There are no local changes, but remote changes. Consider downloading the newest settings.");
         }
         return;
 
     case RepositoryStatus.Diverged: {
-        vscode.window.showWarningMessage("[Upload settings] Your local settings have diverged from the remote repository. Please manually merge your settings with your local repository.");
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "Your local settings have diverged from the remote repository. Please manually merge your settings with your local repository.");
         }
+        vscode.window.showWarningMessage("[Upload settings] Your local settings have diverged from the remote repository. Please manually merge your settings with your local repository.");
         await git.reset(["HEAD~1"]);
         return;
     }
@@ -428,7 +431,6 @@ async function uploadSettings(config: Config, progress: ProgressType) {
 
         if (commitMessage === undefined) {
             await git.reset(["--hard", "HEAD~1"]);
-            vscode.window.showInformationMessage("Upload settings: Canceled upload of configuration");
             return;
         }
 
@@ -438,7 +440,6 @@ async function uploadSettings(config: Config, progress: ProgressType) {
         // push new settings
         progress.report({message: "pushing..."});
         await git.push("origin", "master");
-        vscode.window.showInformationMessage(`Finished uploading settings to git repository '${config.url}'`);
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "Your settings are up to date.");
         }
@@ -460,17 +461,17 @@ async function downloadSettings(config: Config, progress: ProgressType) {
     const status = await getRepositoryStatus(git, progress);
     switch (status) {
     case RepositoryStatus.UpToDate:
-        vscode.window.showInformationMessage("[Download settings] There are no remote changes.");
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "Your settings are up to date.");
         }
         return;
 
     case RepositoryStatus.Ahead:
-        vscode.window.showInformationMessage("[Download settings] There are no remote changes, but you have local changes. Consider uploading your settings.");
         await git.reset(["HEAD~1"]);
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "There are no remote changes, but you have local changes. Consider uploading your settings.");
+        } else {
+            vscode.window.showInformationMessage("[Download settings] There are no remote changes, but you have local changes. Consider uploading your settings.");
         }
         return;
 
@@ -494,9 +495,10 @@ async function downloadSettings(config: Config, progress: ProgressType) {
         await git.merge(["origin/master"]);
         copyRepFilesToLocal(config, progress);
 
-        vscode.window.showInformationMessage(`[Download settings] Finished downloading settings from git repository '${config.url}': ${incomingChangeMessage}`);
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "Your settings are up to date.");
+        } else {
+            vscode.window.showInformationMessage(`[Download settings] Finished downloading settings from git repository '${config.url}': ${incomingChangeMessage}`);
         }
         break;
     }
