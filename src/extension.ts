@@ -145,7 +145,8 @@ export enum RepositoryStatus {
     UpToDate,
     Behind,
     Ahead,
-    Diverged
+    Diverged,
+    Unknown
 }
 
 type Config = {
@@ -153,18 +154,21 @@ type Config = {
     url: string,
     localRep: string,
     openChanges: boolean,
-    project: string | null
+    project: string | null,
+    gitPath: string | null
 };
 
 function getConfig() : Config {
     let vscodeprefsync = vscode.workspace.getConfiguration("vscodeprefsync");
+    let git = vscode.workspace.getConfiguration("git");
 
     let config: Config = {
         ok: true,
         url: "",
         localRep: path.join(extContext.extensionPath, "repository"),
         openChanges: false,
-        project: null
+        project: null,
+        gitPath: null
     };
 
     config.url = vscodeprefsync.get("repositoryUrl") as string;
@@ -173,11 +177,15 @@ function getConfig() : Config {
         config.ok = false;
     }
 
-    // config.localRep = vscodeprefsync.get("localRepository") as string;
-    // if (config.localRep === null || config.localRep === undefined || config.localRep === "") {
-    //     vscode.window.showErrorMessage("Please provide the setting 'vscodeprefsync.localRepository'");
-    //     config.ok = false;
-    // }
+    const rep = vscodeprefsync.get("localRepository") as string;
+    if (rep !== null && rep !== undefined && rep !== "") {
+        config.localRep = rep;
+    }
+
+    const gitPath = git.get("path") as string;
+    if (gitPath !== null && gitPath !== undefined && gitPath !== "") {
+        config.gitPath = gitPath;
+    }
 
     const project = vscodeprefsync.get<string|null>("project");
     if (project === undefined) {
@@ -192,20 +200,24 @@ function getConfig() : Config {
 }
 
 async function getRepositoryStatus(git: simpleGit.SimpleGit, progress: ProgressType | null) : Promise<RepositoryStatus> {
-    const local = (await git.revparse(["@"])).trim();
-    const remote = (await git.revparse(["@{u}"])).trim();
-    const base = (await git.raw(["merge-base", "@", "@{u}"])).trim();
+    try {
+        const local = await git.revparse(["@"]);
+        const remote = await git.revparse(["@{u}"]);
+        const base = await git.raw(["merge-base", "@", "@{u}"]);
 
-    let status = RepositoryStatus.Diverged;
-    if (local === remote) {
-        status = RepositoryStatus.UpToDate;
-    } else if (local === base) {
-        status = RepositoryStatus.Behind;
-    } else if (remote === base) {
-        status = RepositoryStatus.Ahead;
+        let status = RepositoryStatus.Diverged;
+        if (local === remote) {
+            status = RepositoryStatus.UpToDate;
+        } else if (local === base) {
+            status = RepositoryStatus.Behind;
+        } else if (remote === base) {
+            status = RepositoryStatus.Ahead;
+        }
+
+        return status;
+    } catch (e) {
+        return RepositoryStatus.Unknown;
     }
-
-    return status;
 }
 
 /**
@@ -220,7 +232,11 @@ async function getLocalRepository(config: Config, progress: ProgressType | null)
         mkdirRec(parent);
     }
 
-    const git = simpleGit(parent);
+    let git = simpleGit(parent);
+
+    if (config.gitPath !== null) {
+        git = git.customBinary(config.gitPath);
+    }
 
     // check out git repository if does not yet exist
     let justCloned = false;
@@ -279,7 +295,6 @@ function copyLocalFilesToRep(config: Config, progress: ProgressType | null) {
         const repSettings    = path.join(repProject, settingsFile);
 
         copyFile(wsSettings, repSettings);
-        copyFile(path.join(wsVscode, "test.txt"), path.join(repProject, "test.txt"));
     }
 }
 
@@ -345,6 +360,14 @@ async function checkForChanges(config: Config, progress: ProgressType) {
     const status = await getRepositoryStatus(git, progress);
 
     switch (status) {
+    case RepositoryStatus.Unknown:
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Failed to get status of local settings.");
+        } else {
+            vscode.window.showWarningMessage("[Check for changes] Failed to get status of local settings.");
+        }
+        break;
+
     case RepositoryStatus.UpToDate:
         if (prefsyncWindow !== null) {
             updatePrefsSyncWindow(null, "Your settings are up to date.");
@@ -418,6 +441,14 @@ async function uploadSettings(config: Config, progress: ProgressType) {
         return;
     }
 
+    case RepositoryStatus.Unknown:
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Failed to get status of local settings.");
+        } else {
+            vscode.window.showWarningMessage("[Upload settings] Failed to get status of local settings.");
+        }
+        // fallthrough
+
     case RepositoryStatus.Ahead: {
         if (config.openChanges) {
             await diffRemoteToLocal(git, status);
@@ -482,6 +513,14 @@ async function downloadSettings(config: Config, progress: ProgressType) {
             updatePrefsSyncWindow(null, "Your local settings have diverged from the remote repository. There is nothing I can do.");
         }
         return;
+
+    case RepositoryStatus.Unknown:
+        if (prefsyncWindow !== null) {
+            updatePrefsSyncWindow(null, "Failed to get status of local settings.");
+        } else {
+            vscode.window.showWarningMessage("[Download settings] Failed to get status of local settings.");
+        }
+        // fallthrough
 
     case RepositoryStatus.Behind:
         if (config.openChanges) {
