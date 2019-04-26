@@ -2,7 +2,7 @@
     "name": "vscodeprefsync",
     "displayName": "VsCodePrefSync",
     "description": "This extension allows you to synchronize your user settings and key bindings",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "publisher": "Nimaoth",
     "repository": {
         "type": "git",
@@ -58,7 +58,13 @@
                 },
                 "vscodeprefsync.project": {
                     "type": "string",
-                    "default": null
+                    "default": null,
+                    "description": "Unique name. If you want to sync settings.json or other files in your local .vscode directory then provide this setting in your local .vscode/settings.json"
+                },
+                "vscodeprefsync.files": {
+                    "type": "array",
+                    "default": [],
+                    "description": "Array of strings. Additional files to be synchronized from your local .vscode folder. You must provide the setting 'vscodeprefsync.project' for this to work"
                 }
             }
         }
@@ -71,7 +77,7 @@
         "test": "npm run compile && node ./node_modules/vscode/bin/test"
     },
     "dependencies": {
-        "simple-git": "^1.107.0"
+        "simple-git": "^1.110.0"
     },
     "devDependencies": {
         "typescript": "^2.6.1",

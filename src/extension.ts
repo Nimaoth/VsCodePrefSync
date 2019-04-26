@@ -155,7 +155,8 @@ type Config = {
     localRep: string,
     openChanges: boolean,
     project: string | null,
-    gitPath: string | null
+    gitPath: string | null,
+    localFiles: string[]
 };
 
 function getConfig() : Config {
@@ -168,7 +169,8 @@ function getConfig() : Config {
         localRep: path.join(extContext.extensionPath, "repository"),
         openChanges: false,
         project: null,
-        gitPath: null
+        gitPath: null,
+        localFiles: []
     };
 
     config.url = vscodeprefsync.get("repositoryUrl") as string;
@@ -194,6 +196,11 @@ function getConfig() : Config {
         config.project = project;
     }
 
+    const lf = vscodeprefsync.get<string[]|null>("files");
+    if (lf !== undefined) {
+        config.localFiles = lf as string[];
+    }
+
     config.openChanges = vscodeprefsync.get("automaticallyOpenChanges") as boolean;
 
     return config;
@@ -204,6 +211,10 @@ async function getRepositoryStatus(git: simpleGit.SimpleGit, progress: ProgressT
         const local = await git.revparse(["@"]);
         const remote = await git.revparse(["@{u}"]);
         const base = await git.raw(["merge-base", "@", "@{u}"]);
+
+        if (local === null || remote === null || base === null) {
+            return RepositoryStatus.Unknown;
+        }
 
         let status = RepositoryStatus.Diverged;
         if (local === remote) {
@@ -295,6 +306,12 @@ function copyLocalFilesToRep(config: Config, progress: ProgressType | null) {
         const repSettings    = path.join(repProject, settingsFile);
 
         copyFile(wsSettings, repSettings);
+
+        for (const file of config.localFiles) {
+            const from = path.join(wsVscode, file);
+            const to = path.join(repProject, file);
+            copyFile(from, to);
+        }
     }
 }
 
@@ -319,6 +336,12 @@ function copyRepFilesToLocal(config: Config, progress: ProgressType | null) {
         const repSettings    = path.join(repProject, settingsFile);
 
         copyFile(repSettings, wsSettings);
+
+        for (const file of config.localFiles) {
+            const from = path.join(repProject, file);
+            const to = path.join(wsVscode, file);
+            copyFile(from, to);
+        }
     }
 }
 
