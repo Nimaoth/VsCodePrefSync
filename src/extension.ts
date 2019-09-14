@@ -71,10 +71,7 @@ function updatePrefsSyncWindow(title: string | null, message: string) {
             preserveFocus: true,
             viewColumn: vscode.ViewColumn.Active
         }, {
-            enableScripts: true,
-            localResourceRoots: [
-                assetsPath
-            ]
+            enableScripts: true
         });
         prefsyncWindow.onDidDispose(() => {
             prefsyncWindow = null;
@@ -105,7 +102,47 @@ function updatePrefsSyncWindow(title: string | null, message: string) {
     <html>
         <head>
             <meta charset="utf-8" />
-            <link rel="stylesheet" type="text/css" media="screen" href="${path.join(assetsPath.toString(), 'diff_view/diff_view.css')}" />
+            <style>
+                body {
+                    margin: 20px;
+                }
+                
+                .addition {
+                    color: lightgreen;
+                }
+                .removal {
+                    color: red;
+                }
+                .regular {
+                    
+                }
+                
+                .code {
+                    padding: 5px;
+                    border: 1px solid grey;
+                }
+                
+                code {
+                    white-space: pre;
+                }
+                
+                .files {
+                    margin: 30px 0;
+                }
+                
+                .changes {
+                    margin: 10px 0;
+                }
+                
+                ul {
+                    list-style: none;
+                }
+                
+                * {
+                    font-family: monospace;
+                    font-size: 20px;
+                }
+            </style>
         </head>
         <body>
             <button type="button" id="bCheckAgain">Check Again</button>
@@ -119,7 +156,48 @@ function updatePrefsSyncWindow(title: string | null, message: string) {
 
             <span id="test"></span>
 
-            <script src="${path.join(assetsPath.toString(), 'diff_view/diff_view.js')}"></script>
+            <script>
+                let bCheckAgain = document.getElementById("bCheckAgain");
+                let bUpload = document.getElementById("bUpload");
+                let bDownload = document.getElementById("bDownload");
+                let bRevert = document.getElementById("bRevert");
+                let sTest = document.getElementById("test");
+
+                const vscode = acquireVsCodeApi();
+
+                function click(callback) {
+                    return event => {
+                        if (event.detail === 0) { // key pressed by enter key
+                            return;
+                        }
+                        callback(event);
+                    };
+                }
+
+                bCheckAgain.addEventListener('click', click(event => {
+                    vscode.postMessage({
+                        command: 'check_again'
+                    });
+                }));
+
+                bDownload.addEventListener('click', click(event => {
+                    vscode.postMessage({
+                        command: 'download'
+                    });
+                }));
+
+                bUpload.addEventListener('click', click(event => {
+                    vscode.postMessage({
+                        command: 'upload'
+                    });
+                }));
+
+                bRevert.addEventListener('click', click(event => {
+                    vscode.postMessage({
+                        command: 'revert'
+                    });
+                }));
+            </script>
         </body>
     </html>`;
     prefsyncWindow.reveal();
@@ -208,9 +286,22 @@ function getConfig() : Config {
 
 async function getRepositoryStatus(git: simpleGit.SimpleGit, progress: ProgressType | null) : Promise<RepositoryStatus> {
     try {
-        const local = await git.revparse(["@"]);
-        const remote = await git.revparse(["@{u}"]);
-        const base = await git.raw(["merge-base", "@", "@{u}"]);
+        let local = await git.revparse(["@"]);
+        let remote = await git.revparse(["@{u}"]);
+        let base = await git.raw(["merge-base", "@", "@{u}"]);
+
+        // tslint:disable-next-line:triple-equals
+        if (local != null) {
+            local = local.trim();
+        }
+        // tslint:disable-next-line:triple-equals
+        if (remote != null) {
+            remote = remote.trim();
+        }
+        // tslint:disable-next-line:triple-equals
+        if (base != null) {
+            base = base.trim();
+        }
 
         if (local === null || remote === null || base === null) {
             return RepositoryStatus.Unknown;
