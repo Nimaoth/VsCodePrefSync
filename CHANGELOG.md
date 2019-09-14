@@ -2,6 +2,11 @@
 All notable changes to the "vscodeprefsync" extension will be documented in this file.
 
 
+## [1.0.6] - 2019-09-14
+### Changed
+- Updated dependencies
+- Bug fixes
+
 ## [1.0.5] - 2019-04-26
 ### Changed
 - If the extension can't find out the status of your settings (ahead, behind, diverged, up to date) it will try to upload/download anyways.

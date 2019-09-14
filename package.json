@@ -2,7 +2,7 @@
     "name": "vscodeprefsync",
     "displayName": "VsCodePrefSync",
     "description": "This extension allows you to synchronize your user settings and key bindings",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "publisher": "Nimaoth",
     "repository": {
         "type": "git",
